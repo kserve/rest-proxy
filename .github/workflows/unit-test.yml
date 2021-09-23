@@ -1,0 +1,19 @@
+name: Unit Test and Lint
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build develop image
+        run: make build.develop
+      - name: Run lint
+        run: ./scripts/develop.sh make fmt
+      - name: Run unit test
+        run: ./scripts/develop.sh make test
