@@ -23,7 +23,11 @@ build.develop:
 	docker build -t ${IMG_NAME}-develop:latest --target develop .
 
 fmt:
-	./scripts/fmt.sh
+	@for x in `go fmt ./proxy/`; \
+		do echo "Formatted file :$$x" && exit 1; \
+	done \
+
+	@echo "All files are already formatted, congrats !!"
 
 test:
 	go test -coverprofile cover.out `go list ./...`
