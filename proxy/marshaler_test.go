@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	gw "github.com/kserve/rest-proxy/gen"
 )
 
@@ -93,6 +94,25 @@ var data4D = `
 	]
 `
 
+func generateProtoBufResponse() gw.ModelInferResponse {
+	expectedOutput := []*gw.ModelInferResponse_InferOutputTensor{{
+		Name:     "predict",
+		Datatype: "INT64",
+		Shape:    []int64{2},
+		Contents: &gw.InferTensorContents{
+			Int64Contents: []int64{8, 8},
+		},
+	}}
+
+	return gw.ModelInferResponse{
+		ModelName: "example",
+		Id:        "foo",
+		Outputs:   expectedOutput,
+	}
+}
+
+var jsonResponse = `{"model_name":"example","id":"foo","outputs":[{"name":"predict","datatype":"INT64","shape":[2],"contents":{"int64_contents":[8,8]}}]}`
+
 func generateProtoBufRequest(shape []int64) *gw.ModelInferRequest {
 	var expectedInput = gw.ModelInferRequest_InferInputTensor{
 		Name:     "predict",
@@ -118,7 +138,7 @@ func generateProtoBufRequest(shape []int64) *gw.ModelInferRequest {
 	return modelInferRequest
 }
 
-func TestRestReq(t *testing.T) {
+func TestRESTRequest(t *testing.T) {
 	c := CustomJSONPb{}
 	inputDataArray := []string{data1D, data2D, data3D, data4D}
 	inputDataShapes := [][]int64{{2, 64}, {2, 64}, {2, 2, 32}, {2, 2, 2, 16}}
@@ -136,4 +156,14 @@ func TestRestReq(t *testing.T) {
 	}
 }
 
-
+func TestRESTResponse(t *testing.T) {
+	c := CustomJSONPb{}
+	v := generateProtoBufResponse()
+	marshal, err := c.Marshal(v)
+	if err != nil {
+		t.Error(err)
+	}
+	if d := cmp.Diff(string(marshal), jsonResponse); d != "" {
+		t.Errorf("diff :%s", d)
+	}
+}

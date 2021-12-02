@@ -82,7 +82,6 @@ var tensorTypes = map[string]tensorType{
 // returning to the user.
 func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 	if r, ok := v.(*gw.ModelInferResponse); ok {
-		fmt.Printf("%v, %v\n", v, r)
 		resp := &RESTResponse{}
 		resp.ModelName = r.ModelName
 		resp.ModelVersion = r.ModelVersion
