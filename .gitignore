@@ -19,3 +19,6 @@ google/
 # general
 .env
 .bash_history
+
+# IDE
+.idea/
