@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"reflect"
 	"strings"
@@ -180,6 +181,37 @@ func TestRESTResponse(t *testing.T) {
 		t.Error(err)
 	}
 	if d := cmp.Diff(string(marshal), jsonResponse); d != "" {
+		t.Errorf("diff :%s", d)
+	}
+}
+
+func TestRESTResponseRawOutput(t *testing.T) {
+	c := CustomJSONPb{}
+	buf := new(bytes.Buffer)
+	var val int64 = 7
+	if err := binary.Write(buf, binary.LittleEndian, val); err != nil {
+		t.Error(err)
+	}
+	v := &gw.ModelInferResponse{
+		ModelName: "example",
+		Id:        "foo",
+		Outputs: []*gw.ModelInferResponse_InferOutputTensor{{
+			Name:     "predict",
+			Datatype: "INT64",
+			Shape:    []int64{1, 1},
+		}},
+		RawOutputContents: [][]byte{
+			buf.Bytes(),
+		},
+	}
+
+	output, err := c.Marshal(v)
+	if err != nil {
+		t.Error(err)
+	}
+
+	expected := `{"model_name":"example","id":"foo","outputs":[{"name":"predict","datatype":"INT64","shape":[1,1],"data":[7]}]}`
+	if d := cmp.Diff(expected, string(output)); d != "" {
 		t.Errorf("diff :%s", d)
 	}
 }

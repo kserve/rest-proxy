@@ -238,7 +238,7 @@ func readBytes(dataBytes []byte, elementType tensorType, index int, numElements 
 	start := index * tensorSize
 	buf := bytes.NewBuffer(dataBytes[start : start+tensorSize])
 	data := reflect.MakeSlice(elementType.sliceType, numElements, numElements).Interface()
-	return &data, binary.Read(buf, binary.LittleEndian, &data)
+	return data, binary.Read(buf, binary.LittleEndian, data)
 }
 
 func sliceType(v interface{}) reflect.Type {
