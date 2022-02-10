@@ -34,6 +34,7 @@ import (
 
 const (
 	restProxyPortEnvVar     = "REST_PROXY_LISTEN_PORT"
+	restProxyGrpcMaxMsgSize = "REST_PROXY_GRPC_MAX_MSG_SIZE"
 	restProxyGrpcPortEnvVar = "REST_PROXY_GRPC_PORT"
 	restProxyTlsEnvVar      = "REST_PROXY_USE_TLS"
 	tlsCertEnvVar           = "MM_TLS_KEY_CERT_PATH"
@@ -41,11 +42,26 @@ const (
 )
 
 var (
-	grpcServerEndpoint   = "localhost"
+	grpcServerEndpoint = "localhost"
+	logger             = zap.New()
+
+	// Defaults
 	inferenceServicePort = 8033
-	logger               = zap.New()
 	listenPort           = 8008
+	maxGrpcSize          = 16777216
 )
+
+func getIntegerEnv(envVar string, defaultValue int) int {
+	if val, ok := os.LookupEnv(envVar); ok {
+		val, err := strconv.Atoi(val)
+		if err != nil {
+			logger.Error(err, "unable to parse environment variable", "env", envVar)
+			os.Exit(1)
+		}
+		return val
+	}
+	return defaultValue
+}
 
 func run() error {
 	logger.Info("Starting REST Proxy...")
@@ -62,6 +78,8 @@ func run() error {
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, marshaler),
 	)
 
+	maxGrpcSize = getIntegerEnv(restProxyGrpcMaxMsgSize, maxGrpcSize)
+
 	var opts []grpc.DialOption
 	if useTLS, ok := os.LookupEnv(restProxyTlsEnvVar); ok && useTLS == "true" {
 		logger.Info("Using TLS")
@@ -71,38 +89,26 @@ func run() error {
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(credentials.NewTLS(config)),
 			grpc.WithBlock(),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcSize)),
 		}
 	} else {
 		logger.Info("Not using TLS")
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithBlock(),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcSize)),
 		}
 	}
+	inferenceServicePort = getIntegerEnv(restProxyGrpcPortEnvVar, inferenceServicePort)
 
-	if port, ok := os.LookupEnv(restProxyGrpcPortEnvVar); ok {
-		grpcPort, err := strconv.Atoi(port)
-		if err != nil {
-			logger.Error(err, "unable to parse gRPC port environment variable")
-			os.Exit(1)
-		}
-		inferenceServicePort = grpcPort
-	}
-
-	logger.Info("Registering gRPC Inference Service Handler", "Host", grpcServerEndpoint, "Port", inferenceServicePort)
+	logger.Info("Registering gRPC Inference Service Handler", "Host", grpcServerEndpoint, "Port", inferenceServicePort, "MaxCallRecvMsgSize", maxGrpcSize)
 	err := gw.RegisterGRPCInferenceServiceHandlerFromEndpoint(
 		ctx, mux, fmt.Sprintf("%s:%d", grpcServerEndpoint, inferenceServicePort), opts)
 	if err != nil {
 		return err
 	}
 
-	if port, ok := os.LookupEnv(restProxyPortEnvVar); ok {
-		listenPort, err = strconv.Atoi(port)
-		if err != nil {
-			logger.Error(err, "unable to parse port environment variable")
-			os.Exit(1)
-		}
-	}
+	listenPort = getIntegerEnv(restProxyPortEnvVar, listenPort)
 
 	// Start HTTP(S) server (and proxy calls to gRPC server endpoint)
 
