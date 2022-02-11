@@ -34,7 +34,7 @@ import (
 
 const (
 	restProxyPortEnvVar     = "REST_PROXY_LISTEN_PORT"
-	restProxyGrpcMaxMsgSize = "REST_PROXY_GRPC_MAX_MSG_SIZE"
+	restProxyGrpcMaxMsgSize = "REST_PROXY_GRPC_MAX_MSG_SIZE_BYTES"
 	restProxyGrpcPortEnvVar = "REST_PROXY_GRPC_PORT"
 	restProxyTlsEnvVar      = "REST_PROXY_USE_TLS"
 	tlsCertEnvVar           = "MM_TLS_KEY_CERT_PATH"
@@ -46,9 +46,9 @@ var (
 	logger             = zap.New()
 
 	// Defaults
-	inferenceServicePort = 8033
-	listenPort           = 8008
-	maxGrpcSize          = 16777216
+	inferenceServicePort    = 8033
+	listenPort              = 8008
+	maxGrpcMessageSizeBytes = 16777216
 )
 
 func getIntegerEnv(envVar string, defaultValue int) int {
@@ -78,7 +78,7 @@ func run() error {
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, marshaler),
 	)
 
-	maxGrpcSize = getIntegerEnv(restProxyGrpcMaxMsgSize, maxGrpcSize)
+	maxGrpcMessageSizeBytes = getIntegerEnv(restProxyGrpcMaxMsgSize, maxGrpcMessageSizeBytes)
 
 	var opts []grpc.DialOption
 	if useTLS, ok := os.LookupEnv(restProxyTlsEnvVar); ok && useTLS == "true" {
@@ -89,19 +89,19 @@ func run() error {
 		opts = []grpc.DialOption{
 			grpc.WithTransportCredentials(credentials.NewTLS(config)),
 			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcSize)),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcMessageSizeBytes)),
 		}
 	} else {
 		logger.Info("Not using TLS")
 		opts = []grpc.DialOption{
 			grpc.WithInsecure(),
 			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcSize)),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcMessageSizeBytes)),
 		}
 	}
 	inferenceServicePort = getIntegerEnv(restProxyGrpcPortEnvVar, inferenceServicePort)
 
-	logger.Info("Registering gRPC Inference Service Handler", "Host", grpcServerEndpoint, "Port", inferenceServicePort, "MaxCallRecvMsgSize", maxGrpcSize)
+	logger.Info("Registering gRPC Inference Service Handler", "Host", grpcServerEndpoint, "Port", inferenceServicePort, "MaxCallRecvMsgSize", maxGrpcMessageSizeBytes)
 	err := gw.RegisterGRPCInferenceServiceHandlerFromEndpoint(
 		ctx, mux, fmt.Sprintf("%s:%d", grpcServerEndpoint, inferenceServicePort), opts)
 	if err != nil {
