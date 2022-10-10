@@ -46,24 +46,24 @@ const (
 )
 
 type OutputTensor struct {
-	Name       string                        `json:"name,omitempty"`
-	Datatype   string                        `json:"datatype,omitempty"`
-	Shape      []int64                       `json:"shape,omitempty"`
-	Parameters map[string]*gw.InferParameter `json:"parameters,omitempty"`
-	Data       interface{}                   `json:"data,omitempty"`
+	Name       string                 `json:"name,omitempty"`
+	Datatype   string                 `json:"datatype,omitempty"`
+	Shape      []int64                `json:"shape,omitempty"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Data       interface{}            `json:"data,omitempty"`
 }
 
 type RESTResponse struct {
-	ModelName    string                        `json:"model_name,omitempty"`
-	ModelVersion string                        `json:"model_version,omitempty"`
-	Id           string                        `json:"id,omitempty"`
-	Parameters   map[string]*gw.InferParameter `json:"parameters,omitempty"`
-	Outputs      []OutputTensor                `json:"outputs,omitempty"`
+	ModelName    string                 `json:"model_name,omitempty"`
+	ModelVersion string                 `json:"model_version,omitempty"`
+	Id           string                 `json:"id,omitempty"`
+	Parameters   map[string]interface{} `json:"parameters,omitempty"`
+	Outputs      []OutputTensor         `json:"outputs,omitempty"`
 }
 
 type RESTRequest struct {
 	Id         string                                             `json:"id,omitempty"`
-	Parameters map[string]*gw.InferParameter                      `json:"parameters,omitempty"`
+	Parameters parameterMap                                       `json:"parameters,omitempty"`
 	Inputs     []InputTensor                                      `json:"inputs,omitempty"`
 	Outputs    []*gw.ModelInferRequest_InferRequestedOutputTensor `json:"outputs,omitempty"`
 }
@@ -102,7 +102,7 @@ func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 		resp.ModelName = r.ModelName
 		resp.ModelVersion = r.ModelVersion
 		resp.Id = r.Id
-		resp.Parameters = r.Parameters
+		resp.Parameters = parameterMapToJson(r.Parameters)
 		resp.Outputs = make([]OutputTensor, len(r.Outputs))
 
 		for index, output := range r.Outputs {
@@ -110,7 +110,7 @@ func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 			tensor.Name = output.Name
 			tensor.Datatype = output.Datatype
 			tensor.Shape = output.Shape
-			tensor.Parameters = output.Parameters
+			tensor.Parameters = parameterMapToJson(output.Parameters)
 
 			if r.RawOutputContents != nil {
 				tt, ok := tensorTypes[tensor.Datatype]
@@ -171,8 +171,8 @@ type InputTensorMeta struct {
 }
 
 type InputTensorData struct {
-	Data       tensorDataUnmarshaller        `json:"data"`
-	Parameters map[string]*gw.InferParameter `json:"parameters"`
+	Data       tensorDataUnmarshaller `json:"data"`
+	Parameters parameterMap           `json:"parameters"`
 }
 
 func (t *InputTensor) UnmarshalJSON(data []byte) error {
@@ -197,6 +197,75 @@ func (t *InputTensor) UnmarshalJSON(data []byte) error {
 		Contents:   contents,
 	}
 
+	return nil
+}
+
+var (
+	NIL_PARAM   = &gw.InferParameter{}
+	TRUE_PARAM  = &gw.InferParameter{ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: true}}
+	FALSE_PARAM = &gw.InferParameter{ParameterChoice: &gw.InferParameter_BoolParam{}}
+)
+
+type parameterMap map[string]*gw.InferParameter
+
+func (p *parameterMap) MarshalJSON() ([]byte, error) {
+	var pm map[string]interface{}
+	if p != nil {
+		pm = parameterMapToJson(*p)
+	}
+	return json.Marshal(pm)
+}
+
+func parameterMapToJson(pm map[string]*gw.InferParameter) map[string]interface{} {
+	jsonMap := make(map[string]interface{}, len(pm))
+	for k, ip := range pm {
+		var val interface{}
+		if ip != nil {
+			switch v := ip.ParameterChoice.(type) {
+			case *gw.InferParameter_BoolParam:
+				val = v.BoolParam
+			case *gw.InferParameter_StringParam:
+				val = v.StringParam
+			case *gw.InferParameter_Int64Param:
+				val = v.Int64Param
+			}
+		}
+		jsonMap[k] = val // may be nil
+	}
+	return jsonMap
+}
+
+func (p *parameterMap) UnmarshalJSON(data []byte) error {
+	var jsonMap map[string]interface{}
+	if err := json.Unmarshal(data, &jsonMap); err != nil {
+		return err
+	}
+	pm := make(parameterMap, len(jsonMap))
+	for k, i := range jsonMap {
+		switch v := i.(type) {
+		case string:
+			pm[k] = &gw.InferParameter{ParameterChoice: &gw.InferParameter_StringParam{StringParam: v}}
+		case float64:
+			intVal := int64(v)
+			if float64(intVal) != v {
+				logger.Error(nil, "Warning: Number parameter lost precision during int conversion",
+					"parameter", k, "value", v)
+			}
+			pm[k] = &gw.InferParameter{ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: intVal}}
+		case bool:
+			if v {
+				pm[k] = TRUE_PARAM
+			} else {
+				pm[k] = FALSE_PARAM
+			}
+		case nil:
+			pm[k] = NIL_PARAM
+		default:
+			logger.Error(nil, "Could not convert parameter of unsupported type (json array or object)",
+				"parameter", k)
+		}
+	}
+	*p = pm
 	return nil
 }
 
