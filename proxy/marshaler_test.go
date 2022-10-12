@@ -20,9 +20,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"reflect"
 	"strings"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/google/go-cmp/cmp"
 	gw "github.com/kserve/rest-proxy/gen"
@@ -31,11 +32,21 @@ import (
 func restRequest(data string, shape string) string {
 	return `{
 	"id": "foo",
+    "parameters": {
+		"top_level": "foo",
+		"bool_param": false
+    },
 	"inputs": [{
 		"name": "predict",
 		"shape": ` + shape + `,
 		"datatype": "FP32",
-		"data":` + data + `
+		"data":` + data + `,
+        "parameters": {
+            "content_type": "str",
+			"headers": null,
+			"int_param": 42,
+			"bool_param": true
+        }
 		}]
 	}`
 }
@@ -125,16 +136,29 @@ func generateProtoBufResponse() *gw.ModelInferResponse {
 		ModelName: "example",
 		Id:        "foo",
 		Outputs:   expectedOutput,
+		Parameters: map[string]*gw.InferParameter{
+			"content_type": {ParameterChoice: &gw.InferParameter_StringParam{StringParam: "bar"}},
+			"headers":      {ParameterChoice: nil},
+			"int_param":    {ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: 12345}},
+			"bool_param":   {ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: false}},
+		},
 	}
 }
 
-var jsonResponse = `{"model_name":"example","id":"foo","outputs":[{"name":"predict","datatype":"INT64","shape":[2],"data":[8,8]}]}`
+var jsonResponse = `{"model_name":"example","id":"foo","parameters":{"bool_param":false,"content_type":"bar","headers":null,"int_param":12345},` +
+	`"outputs":[{"name":"predict","datatype":"INT64","shape":[2],"data":[8,8]}]}`
 
 func generateProtoBufRequest(shape []int64) *gw.ModelInferRequest {
 	var expectedInput = gw.ModelInferRequest_InferInputTensor{
 		Name:     "predict",
 		Datatype: "FP32",
 		Shape:    shape,
+		Parameters: map[string]*gw.InferParameter{
+			"content_type": {ParameterChoice: &gw.InferParameter_StringParam{StringParam: "str"}},
+			"headers":      {ParameterChoice: nil},
+			"int_param":    {ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: 42}},
+			"bool_param":   {ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: true}},
+		},
 		Contents: &gw.InferTensorContents{
 			Fp32Contents: []float32{0.0, 0.0, 1.0, 11.0, 14.0, 15.0, 3.0, 0.0, 0.0, 1.0, 13.0, 16.0, 12.0,
 				16.0, 8.0, 0.0, 0.0, 8.0, 16.0, 4.0, 6.0, 16.0, 5.0, 0.0, 0.0, 5.0, 15.0, 11.0, 13.0,
@@ -149,7 +173,11 @@ func generateProtoBufRequest(shape []int64) *gw.ModelInferRequest {
 	}
 
 	var modelInferRequest = &gw.ModelInferRequest{
-		Id:     "foo",
+		Id: "foo",
+		Parameters: map[string]*gw.InferParameter{
+			"top_level":  {ParameterChoice: &gw.InferParameter_StringParam{StringParam: "foo"}},
+			"bool_param": {ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: false}},
+		},
 		Inputs: []*gw.ModelInferRequest_InferInputTensor{&expectedInput},
 	}
 	return modelInferRequest
@@ -167,7 +195,8 @@ func TestRESTRequest(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if !reflect.DeepEqual(out, generateProtoBufRequest(inputDataShapes[k])) {
+		expected := generateProtoBufRequest(inputDataShapes[k])
+		if !proto.Equal(out, expected) {
 			t.Errorf("REST request failed to decode for shape: %v", inputDataShapes[k])
 		}
 	}
