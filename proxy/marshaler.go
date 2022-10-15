@@ -111,19 +111,18 @@ func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 			tensor.Datatype = output.Datatype
 			tensor.Shape = output.Shape
 			tensor.Parameters = parameterMapToJson(output.Parameters)
-
+			if tensor.Datatype == FP16 {
+				return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
+			}
 			if r.RawOutputContents != nil {
 				tt, ok := tensorTypes[tensor.Datatype]
 				if !ok {
 					return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
 						tensor.Datatype)
 				}
-				switch tensor.Datatype {
-				case BYTES:
+				if tensor.Datatype == BYTES {
 					tensor.Data = r.RawOutputContents[index]
-				case FP16:
-					return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
-				default:
+				} else {
 					numElements := int(elementCount(tensor.Shape))
 					var err error
 					if tensor.Data, err = readBytes(r.RawOutputContents[index], tt, 0, numElements); err != nil {
@@ -142,8 +141,6 @@ func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 					tensor.Data = output.Contents.IntContents
 				case INT64:
 					tensor.Data = output.Contents.Int64Contents
-				case FP16:
-					return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
 				case FP32:
 					tensor.Data = output.Contents.Fp32Contents
 				case FP64:
@@ -220,15 +217,13 @@ func parameterMapToJson(pm map[string]*gw.InferParameter) map[string]interface{}
 	jsonMap := make(map[string]interface{}, len(pm))
 	for k, ip := range pm {
 		var val interface{}
-		if ip != nil {
-			switch v := ip.ParameterChoice.(type) {
-			case *gw.InferParameter_BoolParam:
-				val = v.BoolParam
-			case *gw.InferParameter_StringParam:
-				val = v.StringParam
-			case *gw.InferParameter_Int64Param:
-				val = v.Int64Param
-			}
+		switch v := ip.GetParameterChoice().(type) {
+		case *gw.InferParameter_BoolParam:
+			val = v.BoolParam
+		case *gw.InferParameter_StringParam:
+			val = v.StringParam
+		case *gw.InferParameter_Int64Param:
+			val = v.Int64Param
 		}
 		jsonMap[k] = val // may be nil
 	}
