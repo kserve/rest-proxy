@@ -19,10 +19,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"reflect"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -45,29 +42,6 @@ const (
 	BYTES  = "BYTES"
 )
 
-type OutputTensor struct {
-	Name       string                 `json:"name,omitempty"`
-	Datatype   string                 `json:"datatype,omitempty"`
-	Shape      []int64                `json:"shape,omitempty"`
-	Parameters map[string]interface{} `json:"parameters,omitempty"`
-	Data       interface{}            `json:"data,omitempty"`
-}
-
-type RESTResponse struct {
-	ModelName    string                 `json:"model_name,omitempty"`
-	ModelVersion string                 `json:"model_version,omitempty"`
-	Id           string                 `json:"id,omitempty"`
-	Parameters   map[string]interface{} `json:"parameters,omitempty"`
-	Outputs      []OutputTensor         `json:"outputs,omitempty"`
-}
-
-type RESTRequest struct {
-	Id         string                                             `json:"id,omitempty"`
-	Parameters parameterMap                                       `json:"parameters,omitempty"`
-	Inputs     []InputTensor                                      `json:"inputs,omitempty"`
-	Outputs    []*gw.ModelInferRequest_InferRequestedOutputTensor `json:"outputs,omitempty"`
-}
-
 type CustomJSONPb struct {
 	runtime.JSONPb
 }
@@ -75,6 +49,10 @@ type CustomJSONPb struct {
 type tensorType struct {
 	size      int
 	sliceType reflect.Type
+}
+
+func sliceType(v interface{}) reflect.Type {
+	return reflect.SliceOf(reflect.TypeOf(v))
 }
 
 // Sizes of each type in bytes.
@@ -94,198 +72,92 @@ var tensorTypes = map[string]tensorType{
 	BYTES:  {1, sliceType(byte(0))},
 }
 
+type RESTResponse struct {
+	ModelName    string                 `json:"model_name,omitempty"`
+	ModelVersion string                 `json:"model_version,omitempty"`
+	Id           string                 `json:"id,omitempty"`
+	Parameters   map[string]interface{} `json:"parameters,omitempty"`
+	Outputs      []OutputTensor         `json:"outputs,omitempty"`
+}
+
+type OutputTensor struct {
+	Name       string                 `json:"name,omitempty"`
+	Datatype   string                 `json:"datatype,omitempty"`
+	Shape      []int64                `json:"shape,omitempty"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Data       interface{}            `json:"data,omitempty"`
+}
+
 // This function adjusts the gRPC response before marshaling and
 // returning to the user.
 func (c *CustomJSONPb) Marshal(v interface{}) ([]byte, error) {
 	if r, ok := v.(*gw.ModelInferResponse); ok {
-		resp := &RESTResponse{}
-		resp.ModelName = r.ModelName
-		resp.ModelVersion = r.ModelVersion
-		resp.Id = r.Id
-		resp.Parameters = parameterMapToJson(r.Parameters)
-		resp.Outputs = make([]OutputTensor, len(r.Outputs))
-
-		for index, output := range r.Outputs {
-			tensor := &resp.Outputs[index]
-			tensor.Name = output.Name
-			tensor.Datatype = output.Datatype
-			tensor.Shape = output.Shape
-			tensor.Parameters = parameterMapToJson(output.Parameters)
-			if tensor.Datatype == FP16 {
-				return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
-			}
-			if r.RawOutputContents != nil {
-				tt, ok := tensorTypes[tensor.Datatype]
-				if !ok {
-					return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
-						tensor.Datatype)
-				}
-				if tensor.Datatype == BYTES {
-					tensor.Data = r.RawOutputContents[index]
-				} else {
-					numElements := int(elementCount(tensor.Shape))
-					var err error
-					if tensor.Data, err = readBytes(r.RawOutputContents[index], tt, 0, numElements); err != nil {
-						return nil, err
-					}
-				}
-			} else {
-				switch tensor.Datatype {
-				case BOOL:
-					tensor.Data = output.Contents.BoolContents
-				case UINT8, UINT16, UINT32:
-					tensor.Data = output.Contents.UintContents
-				case UINT64:
-					tensor.Data = output.Contents.Uint64Contents
-				case INT8, INT16, INT32:
-					tensor.Data = output.Contents.IntContents
-				case INT64:
-					tensor.Data = output.Contents.Int64Contents
-				case FP32:
-					tensor.Data = output.Contents.Fp32Contents
-				case FP64:
-					tensor.Data = output.Contents.Fp64Contents
-				case BYTES:
-					tensor.Data = output.Contents.BytesContents
-				default:
-					return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
-						tensor.Datatype)
-				}
-			}
+		var err error
+		if v, err = transformResponse(r); err != nil {
+			return nil, err
 		}
-		v = resp
 	}
-
 	return c.JSONPb.Marshal(v)
 }
 
-type InputTensor gw.ModelInferRequest_InferInputTensor
-
-type InputTensorMeta struct {
-	Name     string  `json:"name"`
-	Datatype string  `json:"datatype"`
-	Shape    []int64 `json:"shape"`
-}
-
-type InputTensorData struct {
-	Data       tensorDataUnmarshaller `json:"data"`
-	Parameters parameterMap           `json:"parameters"`
-}
-
-func (t *InputTensor) UnmarshalJSON(data []byte) error {
-	meta := InputTensorMeta{}
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return err
-	}
-	contents := &gw.InferTensorContents{}
-	target, err := targetArray(meta.Datatype, meta.Name, contents)
-	if err != nil {
-		return err
-	}
-	itd := &InputTensorData{Data: tensorDataUnmarshaller{target: target, shape: meta.Shape}}
-	if err := json.Unmarshal(data, itd); err != nil {
-		return err
-	}
-	*t = InputTensor{
-		Name:       meta.Name,
-		Datatype:   meta.Datatype,
-		Shape:      meta.Shape,
-		Parameters: itd.Parameters,
-		Contents:   contents,
+func transformResponse(r *gw.ModelInferResponse) (*RESTResponse, error) {
+	resp := &RESTResponse{
+		ModelName:    r.ModelName,
+		ModelVersion: r.ModelVersion,
+		Id:           r.Id,
+		Parameters:   parameterMapToJson(r.Parameters),
+		Outputs:      make([]OutputTensor, len(r.Outputs)),
 	}
 
-	return nil
-}
-
-var (
-	NIL_PARAM   = &gw.InferParameter{}
-	TRUE_PARAM  = &gw.InferParameter{ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: true}}
-	FALSE_PARAM = &gw.InferParameter{ParameterChoice: &gw.InferParameter_BoolParam{}}
-)
-
-type parameterMap map[string]*gw.InferParameter
-
-func (p *parameterMap) MarshalJSON() ([]byte, error) {
-	var pm map[string]interface{}
-	if p != nil {
-		pm = parameterMapToJson(*p)
-	}
-	return json.Marshal(pm)
-}
-
-func parameterMapToJson(pm map[string]*gw.InferParameter) map[string]interface{} {
-	jsonMap := make(map[string]interface{}, len(pm))
-	for k, ip := range pm {
-		var val interface{}
-		switch v := ip.GetParameterChoice().(type) {
-		case *gw.InferParameter_BoolParam:
-			val = v.BoolParam
-		case *gw.InferParameter_StringParam:
-			val = v.StringParam
-		case *gw.InferParameter_Int64Param:
-			val = v.Int64Param
+	for index, output := range r.Outputs {
+		tensor := &resp.Outputs[index]
+		tensor.Name = output.Name
+		tensor.Datatype = output.Datatype
+		tensor.Shape = output.Shape
+		tensor.Parameters = parameterMapToJson(output.Parameters)
+		if tensor.Datatype == FP16 {
+			return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
 		}
-		jsonMap[k] = val // may be nil
-	}
-	return jsonMap
-}
-
-func (p *parameterMap) UnmarshalJSON(data []byte) error {
-	var jsonMap map[string]interface{}
-	if err := json.Unmarshal(data, &jsonMap); err != nil {
-		return err
-	}
-	pm := make(parameterMap, len(jsonMap))
-	for k, i := range jsonMap {
-		switch v := i.(type) {
-		case string:
-			pm[k] = &gw.InferParameter{ParameterChoice: &gw.InferParameter_StringParam{StringParam: v}}
-		case float64:
-			intVal := int64(v)
-			if float64(intVal) != v {
-				logger.Error(nil, "Warning: Number parameter lost precision during int conversion",
-					"parameter", k, "value", v)
+		if r.RawOutputContents != nil {
+			tt, ok := tensorTypes[tensor.Datatype]
+			if !ok {
+				return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
+					tensor.Datatype)
 			}
-			pm[k] = &gw.InferParameter{ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: intVal}}
-		case bool:
-			if v {
-				pm[k] = TRUE_PARAM
+			if tensor.Datatype == BYTES {
+				tensor.Data = r.RawOutputContents[index]
 			} else {
-				pm[k] = FALSE_PARAM
+				numElements := int(elementCount(tensor.Shape))
+				var err error
+				if tensor.Data, err = readBytes(r.RawOutputContents[index], tt, 0, numElements); err != nil {
+					return nil, err
+				}
 			}
-		case nil:
-			pm[k] = NIL_PARAM
-		default:
-			logger.Error(nil, "Could not convert parameter of unsupported type (json array or object)",
-				"parameter", k)
+		} else {
+			switch tensor.Datatype {
+			case BOOL:
+				tensor.Data = output.Contents.BoolContents
+			case UINT8, UINT16, UINT32:
+				tensor.Data = output.Contents.UintContents
+			case UINT64:
+				tensor.Data = output.Contents.Uint64Contents
+			case INT8, INT16, INT32:
+				tensor.Data = output.Contents.IntContents
+			case INT64:
+				tensor.Data = output.Contents.Int64Contents
+			case FP32:
+				tensor.Data = output.Contents.Fp32Contents
+			case FP64:
+				tensor.Data = output.Contents.Fp64Contents
+			case BYTES:
+				tensor.Data = output.Contents.BytesContents
+			default:
+				return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
+					tensor.Datatype)
+			}
 		}
 	}
-	*p = pm
-	return nil
-}
-
-// This function adjusts the user input before a gRPC message is sent to the server.
-func (c *CustomJSONPb) NewDecoder(r io.Reader) runtime.Decoder {
-	return runtime.DecoderFunc(func(v interface{}) error {
-		req, ok := v.(*gw.ModelInferRequest)
-		if ok {
-			logger.Info("Received REST inference request")
-			restReq := RESTRequest{}
-			if err := json.NewDecoder(r).Decode(&restReq); err != nil {
-				return err
-			}
-
-			req.Id = restReq.Id
-			req.Parameters = restReq.Parameters
-			req.Outputs = restReq.Outputs
-			req.Inputs = make([]*gw.ModelInferRequest_InferInputTensor, len(restReq.Inputs))
-			for i := range restReq.Inputs {
-				req.Inputs[i] = (*gw.ModelInferRequest_InferInputTensor)(&restReq.Inputs[i])
-			}
-			return nil
-		}
-		return c.JSONPb.NewDecoder(r).Decode(v)
-	})
+	return resp, nil
 }
 
 func elementCount(shape []int64) int64 {
@@ -305,97 +177,21 @@ func readBytes(dataBytes []byte, elementType tensorType, index int, numElements 
 	return data, binary.Read(buf, binary.LittleEndian, data)
 }
 
-func sliceType(v interface{}) reflect.Type {
-	return reflect.SliceOf(reflect.TypeOf(v))
-}
+// Output parameters
 
-type tensorDataUnmarshaller struct {
-	target interface{}
-	shape  []int64
-}
-
-func (t *tensorDataUnmarshaller) UnmarshalJSON(data []byte) error {
-	if len(t.shape) <= 1 {
-		return json.Unmarshal(data, t.target) // single-dimension fast-path
-	}
-	start := -1
-	for i, b := range data {
-		if b == '[' {
-			if start != -1 {
-				data = data[start:]
-				break
-			}
-			start = i
-		} else if !isSpace(b) {
-			if start == -1 {
-				return errors.New("invalid tensor data: not a json array")
-			}
-			// fast-path: flat array
-			return json.Unmarshal(data, t.target)
+func parameterMapToJson(pm map[string]*gw.InferParameter) map[string]interface{} {
+	jsonMap := make(map[string]interface{}, len(pm))
+	for k, ip := range pm {
+		var val interface{}
+		switch v := ip.GetParameterChoice().(type) {
+		case *gw.InferParameter_BoolParam:
+			val = v.BoolParam
+		case *gw.InferParameter_StringParam:
+			val = v.StringParam
+		case *gw.InferParameter_Int64Param:
+			val = v.Int64Param
 		}
+		jsonMap[k] = val // may be nil
 	}
-	// here we have nested arrays
-
-	//TODO handle strings / BYTES case
-
-	// strip all the square brackets (update data slice in-place)
-	var o, c int
-	j := 1
-	for _, b := range data {
-		if b == '[' {
-			o++
-		} else if b == ']' {
-			c++
-		} else {
-			data[j] = b
-			j++
-		}
-	}
-	if o != c || o != expectedBracketCount(t.shape) {
-		return errors.New("invalid tensor data: invalid nested json arrays")
-	}
-	data[j] = ']'
-	return json.Unmarshal(data[:j+1], t.target)
-}
-
-func expectedBracketCount(shape []int64) int {
-	n := len(shape) - 1
-	if n < 1 {
-		return 1
-	}
-	p, s := 1, 1
-	for i := 0; i < n; i++ {
-		p *= int(shape[i])
-		s += p
-	}
-	return s
-}
-
-func targetArray(dataType, tensorName string, contents *gw.InferTensorContents) (interface{}, error) {
-	switch dataType {
-	case BOOL:
-		return &contents.BoolContents, nil
-	case UINT8, UINT16, UINT32:
-		return &contents.UintContents, nil
-	case UINT64:
-		return &contents.Uint64Contents, nil
-	case INT8, INT16, INT32:
-		return &contents.IntContents, nil
-	case INT64:
-		return &contents.Int64Contents, nil
-	case FP16:
-		return nil, fmt.Errorf("FP16 tensors not supported (response tensor %s)", tensorName) //TODO
-	case FP32:
-		return &contents.Fp32Contents, nil
-	case FP64:
-		return &contents.Fp64Contents, nil
-	case BYTES:
-		return &contents.BytesContents, nil //TODO still need to figure this one out
-	default:
-		return nil, fmt.Errorf("unsupported datatype: %s", dataType)
-	}
-}
-
-func isSpace(c byte) bool {
-	return c <= ' ' && (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+	return jsonMap
 }
