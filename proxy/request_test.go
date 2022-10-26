@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"fmt"
-	gw "github.com/kserve/rest-proxy/gen"
-	"google.golang.org/protobuf/proto"
 	"strings"
 	"testing"
+
+	gw "github.com/kserve/rest-proxy/gen"
+	"google.golang.org/protobuf/proto"
 )
 
 var data1D = `

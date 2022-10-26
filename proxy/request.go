@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	gw "github.com/kserve/rest-proxy/gen"
-	"io"
 )
 
 // This function adjusts the user input before a gRPC message is sent to the server.
