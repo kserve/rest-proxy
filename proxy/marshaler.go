@@ -42,6 +42,9 @@ const (
 	BYTES  = "BYTES"
 )
 
+const CONTENT_TYPE = "content_type"
+const BASE64 = "base64"
+
 type CustomJSONPb struct {
 	runtime.JSONPb
 }
@@ -118,20 +121,24 @@ func transformResponse(r *gw.ModelInferResponse) (*RESTResponse, error) {
 		if tensor.Datatype == FP16 {
 			return nil, fmt.Errorf("FP16 tensors not supported (request tensor %s)", tensor.Name) //TODO
 		}
+		if tensor.Datatype == BYTES {
+			tensor.Parameters[CONTENT_TYPE] = BASE64
+		}
 		if r.RawOutputContents != nil {
 			tt, ok := tensorTypes[tensor.Datatype]
 			if !ok {
 				return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
 					tensor.Datatype)
 			}
+			numElements := int(elementCount(tensor.Shape))
+			var err error
 			if tensor.Datatype == BYTES {
-				tensor.Data = r.RawOutputContents[index]
+				tensor.Data, err = splitRawBytes(r.RawOutputContents[index], numElements)
 			} else {
-				numElements := int(elementCount(tensor.Shape))
-				var err error
-				if tensor.Data, err = readBytes(r.RawOutputContents[index], tt, 0, numElements); err != nil {
-					return nil, err
-				}
+				tensor.Data, err = readBytes(r.RawOutputContents[index], tt, 0, numElements)
+			}
+			if err != nil {
+				return nil, err
 			}
 		} else {
 			switch tensor.Datatype {
@@ -150,6 +157,8 @@ func transformResponse(r *gw.ModelInferResponse) (*RESTResponse, error) {
 			case FP64:
 				tensor.Data = output.Contents.Fp64Contents
 			case BYTES:
+				// this will be encoded as array of b64-encoded strings
+				//TODO support UTF8 if it's specified as the content type
 				tensor.Data = output.Contents.BytesContents
 			default:
 				return nil, fmt.Errorf("unsupported datatype in inference response outputs: %s",
