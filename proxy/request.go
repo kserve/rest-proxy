@@ -38,7 +38,8 @@ func transformRequest(restReq *RESTRequest, req *gw.ModelInferRequest) {
 }
 
 type RESTRequest struct {
-	Id         string                                             `json:"id,omitempty"`
+	Id string `json:"id,omitempty"`
+	//TODO figure out how to handle request-level content type parameter
 	Parameters parameterMap                                       `json:"parameters,omitempty"`
 	Inputs     []InputTensor                                      `json:"inputs,omitempty"`
 	Outputs    []*gw.ModelInferRequest_InferRequestedOutputTensor `json:"outputs,omitempty"`
@@ -49,9 +50,10 @@ type RESTRequest struct {
 type InputTensor gw.ModelInferRequest_InferInputTensor
 
 type InputTensorMeta struct {
-	Name     string  `json:"name"`
-	Datatype string  `json:"datatype"`
-	Shape    []int64 `json:"shape"`
+	Name       string       `json:"name"`
+	Datatype   string       `json:"datatype"`
+	Shape      []int64      `json:"shape"`
+	Parameters parameterMap `json:"parameters"`
 }
 
 type InputTensorData struct {
@@ -69,7 +71,11 @@ func (t *InputTensor) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	itd := &InputTensorData{Data: tensorDataUnmarshaller{target: target, shape: meta.Shape}}
+	isBytes := meta.Datatype == BYTES
+	itd := &InputTensorData{Data: tensorDataUnmarshaller{
+		target: target, shape: meta.Shape,
+		bytes: isBytes, b64: isBytes && isBase64Content(meta.Parameters),
+	}}
 	if err := json.Unmarshal(data, itd); err != nil {
 		return err
 	}
@@ -77,7 +83,7 @@ func (t *InputTensor) UnmarshalJSON(data []byte) error {
 		Name:       meta.Name,
 		Datatype:   meta.Datatype,
 		Shape:      meta.Shape,
-		Parameters: itd.Parameters,
+		Parameters: meta.Parameters,
 		Contents:   contents,
 	}
 
@@ -110,11 +116,16 @@ func targetArray(dataType, tensorName string, contents *gw.InferTensorContents) 
 }
 
 type tensorDataUnmarshaller struct {
-	target interface{}
 	shape  []int64
+	bytes  bool
+	b64    bool
+	target interface{}
 }
 
 func (t *tensorDataUnmarshaller) UnmarshalJSON(data []byte) error {
+	if t.bytes {
+		return unmarshalBytesJson(t.target.(*[][]byte), t.shape, t.b64, data)
+	}
 	if len(t.shape) <= 1 {
 		return json.Unmarshal(data, t.target) // single-dimension fast-path
 	}
@@ -122,8 +133,10 @@ func (t *tensorDataUnmarshaller) UnmarshalJSON(data []byte) error {
 	for i, b := range data {
 		if b == '[' {
 			if start != -1 {
-				data = data[start:]
-				break
+				if start != 0 {
+					data = data[start:]
+				}
+				break // here we have nested arrays
 			}
 			start = i
 		} else if !isSpace(b) {

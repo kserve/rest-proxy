@@ -51,6 +51,63 @@ func generateProtoBufResponse() *gw.ModelInferResponse {
 var jsonResponse = `{"model_name":"example","id":"foo","parameters":{"bool_param":false,"content_type":"bar","headers":null,"int_param":12345},` +
 	`"outputs":[{"name":"predict","datatype":"INT64","shape":[2],"data":[8,8]}]}`
 
+func generateProtoBufBytesResponse() *gw.ModelInferResponse {
+	expectedOutput := []*gw.ModelInferResponse_InferOutputTensor{{
+		Name:     "predict",
+		Datatype: "BYTES",
+		Shape:    []int64{2, 2},
+		Contents: &gw.InferTensorContents{
+			BytesContents: [][]byte{[]byte("String1"), []byte("String2"), []byte("String3"), []byte("String4")},
+		},
+	}}
+
+	return &gw.ModelInferResponse{
+		ModelName: "example",
+		Id:        "foo",
+		Outputs:   expectedOutput,
+		Parameters: map[string]*gw.InferParameter{
+			"content_type": {ParameterChoice: &gw.InferParameter_StringParam{StringParam: "bar"}},
+			"headers":      {ParameterChoice: nil},
+			"int_param":    {ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: 12345}},
+			"bool_param":   {ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: false}},
+		},
+	}
+}
+
+func generateProtoBufBytesResponseRawOutput() *gw.ModelInferResponse {
+	expectedOutput := []*gw.ModelInferResponse_InferOutputTensor{{
+		Name:     "predict",
+		Datatype: "BYTES",
+		Shape:    []int64{2, 2},
+	}}
+
+	seven := make([]byte, 4)
+	binary.LittleEndian.PutUint32(seven, 7)
+	rawBytes := append(seven, "String1"...)
+	rawBytes = append(rawBytes, seven...)
+	rawBytes = append(rawBytes, "String2"...)
+	rawBytes = append(rawBytes, seven...)
+	rawBytes = append(rawBytes, "String3"...)
+	rawBytes = append(rawBytes, seven...)
+	rawBytes = append(rawBytes, "String4"...)
+
+	return &gw.ModelInferResponse{
+		ModelName: "example",
+		Id:        "foo",
+		Outputs:   expectedOutput,
+		Parameters: map[string]*gw.InferParameter{
+			"content_type": {ParameterChoice: &gw.InferParameter_StringParam{StringParam: "bar"}},
+			"headers":      {ParameterChoice: nil},
+			"int_param":    {ParameterChoice: &gw.InferParameter_Int64Param{Int64Param: 12345}},
+			"bool_param":   {ParameterChoice: &gw.InferParameter_BoolParam{BoolParam: false}},
+		},
+		RawOutputContents: [][]byte{rawBytes},
+	}
+}
+
+var jsonBytesResponse = `{"model_name":"example","id":"foo","parameters":{"bool_param":false,"content_type":"bar","headers":null,"int_param":12345},` +
+	`"outputs":[{"name":"predict","datatype":"BYTES","shape":[2,2],"parameters":{"content_type":"base64"},"data":["U3RyaW5nMQ==","U3RyaW5nMg==","U3RyaW5nMw==","U3RyaW5nNA=="]}]}`
+
 func TestRESTResponse(t *testing.T) {
 	c := CustomJSONPb{}
 	v := generateProtoBufResponse()
@@ -59,6 +116,30 @@ func TestRESTResponse(t *testing.T) {
 		t.Error(err)
 	}
 	if d := cmp.Diff(string(marshal), jsonResponse); d != "" {
+		t.Errorf("diff :%s", d)
+	}
+}
+
+func TestBytesRESTResponse(t *testing.T) {
+	c := CustomJSONPb{}
+	v := generateProtoBufBytesResponse()
+	marshal, err := c.Marshal(v)
+	if err != nil {
+		t.Error(err)
+	}
+	if d := cmp.Diff(string(marshal), jsonBytesResponse); d != "" {
+		t.Errorf("diff :%s", d)
+	}
+}
+
+func TestBytesRESTResponseRawOutput(t *testing.T) {
+	c := CustomJSONPb{}
+	v := generateProtoBufBytesResponseRawOutput()
+	marshal, err := c.Marshal(v)
+	if err != nil {
+		t.Error(err)
+	}
+	if d := cmp.Diff(string(marshal), jsonBytesResponse); d != "" {
 		t.Errorf("diff :%s", d)
 	}
 }
