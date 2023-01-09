@@ -27,6 +27,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	gw "github.com/kserve/rest-proxy/gen"
@@ -81,23 +82,20 @@ func run() error {
 	maxGrpcMessageSizeBytes = getIntegerEnv(restProxyGrpcMaxMsgSize, maxGrpcMessageSizeBytes)
 
 	var opts []grpc.DialOption
+	var transportCreds credentials.TransportCredentials
 	if useTLS, ok := os.LookupEnv(restProxyTlsEnvVar); ok && useTLS == "true" {
 		logger.Info("Using TLS")
-		config := &tls.Config{
+		transportCreds = credentials.NewTLS(&tls.Config{
 			InsecureSkipVerify: true,
-		}
-		opts = []grpc.DialOption{
-			grpc.WithTransportCredentials(credentials.NewTLS(config)),
-			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcMessageSizeBytes)),
-		}
+		})
 	} else {
 		logger.Info("Not using TLS")
-		opts = []grpc.DialOption{
-			grpc.WithInsecure(),
-			grpc.WithBlock(),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcMessageSizeBytes)),
-		}
+		transportCreds = insecure.NewCredentials()
+	}
+	opts = []grpc.DialOption{
+		grpc.WithTransportCredentials(transportCreds),
+		grpc.WithBlock(),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxGrpcMessageSizeBytes)),
 	}
 	inferenceServicePort = getIntegerEnv(restProxyGrpcPortEnvVar, inferenceServicePort)
 
