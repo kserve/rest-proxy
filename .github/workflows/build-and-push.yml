@@ -23,7 +23,6 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
 
     env:
       IMAGE_NAME: rest-proxy
@@ -66,6 +65,7 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           platforms: linux/amd64,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/s390x
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ env.IMAGE_ID }}:${{ env.VERSION }}
           target: runtime
