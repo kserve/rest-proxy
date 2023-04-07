@@ -14,6 +14,14 @@
 
 IMG_NAME ?= kserve/rest-proxy
 
+# collect args from `make run` so that they don't run twice
+ifeq (run,$(firstword $(MAKECMDGOALS)))
+  RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ("$(wildcard /.dockerenv)","")
+    $(error Inside docker container, run 'make $(RUN_ARGS)')
+  endif
+endif
+
 all: build
 
 build:
@@ -22,8 +30,20 @@ build:
 build.develop:
 	docker build -t ${IMG_NAME}-develop:latest --target develop .
 
+develop: build.develop
+	./scripts/develop.sh
+
+run: build.develop
+	./scripts/develop.sh make $(RUN_ARGS)
+
 fmt:
 	./scripts/fmt.sh
 
 test:
 	go test -coverprofile cover.out `go list ./...`
+
+# Override targets if they are included in RUN_ARGs so it doesn't run them twice
+$(eval $(RUN_ARGS):;@:)
+
+# Remove $(MAKECMDGOALS) if you don't intend make to just be a taskrunner
+.PHONY: all build build.develop develop run fmt test $(MAKECMDGOALS)
