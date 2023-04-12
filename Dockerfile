@@ -32,7 +32,8 @@ RUN --mount=type=cache,target=/root/.cache/dnf:rw \
 
 # Install pre-commit
 RUN --mount=type=cache,target=/root/.cache/pip \
-    sudo -H pip3 install pre-commit \
+    pip3 install --cache-dir /root/.cache/pip \
+       pre-commit \
     && pip3 list \
     && true
 
