@@ -24,18 +24,17 @@ USER root
 
 # Install build and dev tools
 RUN --mount=type=cache,target=/root/.cache/dnf:rw \
-    dnf install -y --nodocs --setopt=cachedir=/root/.cache/dnf \
+    dnf install --setopt=cachedir=/root/.cache/dnf -y --nodocs \
        python3 \
        python3-pip \
        nodejs \
     && true
 
 # Install pre-commit
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --cache-dir /root/.cache/pip \
-       pre-commit \
-    && pip3 list \
-    && true
+ARG PIP_CACHE_DIR=/root/.cache/pip
+RUN --mount=type=cache,target=$PIP_CACHE_DIR \
+    pip3 install pre-commit && \
+    pip3 list
 
 # When using the BuildKit backend, Docker predefines a set of ARG variables with
 # information on the platform of the node performing the build (build platform)
