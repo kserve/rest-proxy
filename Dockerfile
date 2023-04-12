@@ -32,7 +32,8 @@ RUN --mount=type=cache,target=/root/.cache/dnf:rw \
 
 # Install pre-commit
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install pre-commit \
+    sudo -H pip3 install pre-commit \
+    && pip3 list \
     && true
 
 # When using the BuildKit backend, Docker predefines a set of ARG variables with
