@@ -15,12 +15,13 @@
 ###############################################################################
 # Stage 1: Create the developer image for the BUILDPLATFORM only
 ###############################################################################
-ARG GOLANG_VERSION=1.18.9
+ARG GOLANG_VERSION=1.18
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:$GOLANG_VERSION AS develop
 
 ARG PROTOC_VERSION=21.12
 
 USER root
+ENV HOME=/root
 
 # Install build and dev tools
 RUN --mount=type=cache,target=/root/.cache/dnf:rw \
@@ -32,9 +33,8 @@ RUN --mount=type=cache,target=/root/.cache/dnf:rw \
 
 # Install pre-commit
 ARG PIP_CACHE_DIR=/root/.cache/pip
-RUN --mount=type=cache,target=$PIP_CACHE_DIR \
-    pip3 install pre-commit && \
-    pip3 list
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install pre-commit
 
 # When using the BuildKit backend, Docker predefines a set of ARG variables with
 # information on the platform of the node performing the build (build platform)
@@ -77,8 +77,14 @@ WORKDIR /opt/app
 COPY go.mod go.sum ./
 
 # Install go protoc plugins
-RUN go get google.golang.org/protobuf/cmd/protoc-gen-go \
-           google.golang.org/grpc/cmd/protoc-gen-go-grpc
+ENV PATH $HOME/go/bin:$PATH
+RUN true \
+    && go get google.golang.org/protobuf/cmd/protoc-gen-go \
+              google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && go install google.golang.org/protobuf/cmd/protoc-gen-go \
+                  google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && protoc-gen-go --version \
+    && true
 
 # Download and initialize the pre-commit environments before copying the source so they will be cached
 COPY .pre-commit-config.yaml ./
