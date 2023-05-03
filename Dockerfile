@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/dnf:rw \
     && true
 
 # Install pre-commit
-ARG PIP_CACHE_DIR=/root/.cache/pip
+ENV PIP_CACHE_DIR=/root/.cache/pip
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install pre-commit
 
@@ -115,14 +115,15 @@ COPY . ./
 ARG TARGETOS
 ARG TARGETARCH
 
-ARG GOOS=${TARGETOS:-linux}
-ARG GOARCH=${TARGETARCH:-amd64}
-
 # Build the binaries using native go compiler from BUILDPLATFORM but compiled output for TARGETPLATFORM
 # https://www.docker.com/blog/faster-multi-platform-builds-dockerfile-cross-compilation-guide/
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GO111MODULE=on go build -a -o /go/bin/server ./proxy/
+    GOOS=${TARGETOS:-linux} \
+    GOARCH=${TARGETARCH:-amd64} \
+    CGO_ENABLED=0 \
+    GO111MODULE=on \
+    go build -a -o /go/bin/server ./proxy/
 
 
 ###############################################################################
