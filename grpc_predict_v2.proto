@@ -41,7 +41,14 @@ service GRPCInferenceService
   // The per-model metadata API provides information about a model. Errors are
   // indicated by the google.rpc.Status returned for the request. The OK code
   // indicates success and other codes indicate failure.
-  rpc ModelMetadata(ModelMetadataRequest) returns (ModelMetadataResponse) {}
+  rpc ModelMetadata(ModelMetadataRequest) returns (ModelMetadataResponse) {
+    option (google.api.http) = {
+      get: "/v2/models/{name}"
+      additional_bindings {
+        get: "/v2/models/{name}/versions/{version}"
+      }
+    };
+  }
 
   // The ModelInfer API performs inference using the specified model. Errors are
   // indicated by the google.rpc.Status returned for the request. The OK code
