@@ -39,14 +39,14 @@ exit 1
 esac
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "${DIR}/.." ||
+cd "${DIR}/.."
 
 # Make sure .bash_history exists and is a file
-touch .bash_history
+touch ".bash_history"
 
 declare -a docker_run_args=(
   -v "${PWD}:/opt/app"
-  -v "${PWD}/.bash_history:/opt/app/.bash_history"
+  -v "${PWD}/.bash_history:/root/.bash_history"
 )
 
 if [ "${CI}" != "true" ]; then
@@ -55,7 +55,7 @@ if [ "${CI}" != "true" ]; then
   )
 else
   docker_run_args+=(
-    -e CI=true
+    "-e CI=true"
   )
 fi
 

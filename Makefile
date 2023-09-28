@@ -23,8 +23,17 @@ ifeq (run,$(firstword $(MAKECMDGOALS)))
 endif
 
 .PHONY: all
-## Alias for `build`
-all: build
+## Alias for `generate build test`
+all: generate build test
+
+.PHONY: generate
+## Generate GRPC gateway stubs
+generate: google/api/annotations.proto google/api/http.proto
+	protoc -I . --grpc-gateway_out ./gen/ --grpc-gateway_opt logtostderr=true --grpc-gateway_opt paths=source_relative grpc_predict_v2.proto
+
+google/api/%.proto:
+	@mkdir -p google/api
+	@test -f $@ || wget --inet4-only -q -O $@ https://raw.githubusercontent.com/googleapis/googleapis/master/$@
 
 .PHONY: build
 ## Build runtime Docker image
