@@ -46,6 +46,6 @@ docker push ${DOCKER_USER}/rest-proxy:${DOCKER_TAG}
 
 ### Update your ModelMesh deployment
 
-In order to use the newly built `rest-proxy` image in a [Modelmesh Serving deployment](https://github.com/kserve/modelmesh-serving#modelmesh-serving) update the `restProxy.image` in [config/default/config-defaults.yaml](https://github.com/kserve/modelmesh-serving/blob/v0.11.0/config/default/config-defaults.yaml#L31-L32) and (re)deploy the Modelmesh Serving.
+In order to use the newly built `rest-proxy` image in a [ModelMesh Serving deployment](https://github.com/kserve/modelmesh-serving#modelmesh-serving) update the `restProxy.image` in [config/default/config-defaults.yaml](https://github.com/kserve/modelmesh-serving/blob/v0.11.0/config/default/config-defaults.yaml#L31-L32) and (re)deploy the ModelMesh Serving.
 
-To update a running deployment of ModelMesh serving, add or update the `restProxy.image` section in the `model-serving-config` `ConfigMap` as described the [Modelmesh Serving configuration instructions](https://github.com/kserve/modelmesh-serving/tree/main/docs/configuration).
+To update a running deployment of ModelMesh serving, add or update the `restProxy.image` section in the `model-serving-config` `ConfigMap` as described the [ModelMesh Serving configuration instructions](https://github.com/kserve/modelmesh-serving/tree/main/docs/configuration).
