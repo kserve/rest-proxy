@@ -31,11 +31,7 @@ all: generate build test
 generate: google/api/annotations.proto google/api/http.proto
 	protoc -I . --grpc-gateway_out ./gen/ --grpc-gateway_opt logtostderr=true --grpc-gateway_opt paths=source_relative grpc_predict_v2.proto
 
-google/api/annotations.proto:
-	@mkdir -p google/api
-	@test -f $@ || wget --inet4-only -q -O $@ https://raw.githubusercontent.com/googleapis/googleapis/master/$@
-
-google/api/http.proto:
+google/api/%.proto:
 	@mkdir -p google/api
 	@test -f $@ || wget --inet4-only -q -O $@ https://raw.githubusercontent.com/googleapis/googleapis/master/$@
 
