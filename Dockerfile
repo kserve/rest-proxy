@@ -76,13 +76,15 @@ WORKDIR /opt/app
 
 COPY go.mod go.sum ./
 
-# Install go protoc plugins
+# Install go protoc plugins,
+# no required module provides package google.golang.org/grpc/cmd/protoc-gen-go-grpc
+# to add it run `go get google.golang.org/grpc/cmd/protoc-gen-go-grpc`
 ENV PATH $HOME/go/bin:$PATH
 RUN true \
-    && go get google.golang.org/protobuf/cmd/protoc-gen-go \
-              google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-    && go install google.golang.org/protobuf/cmd/protoc-gen-go \
-                  google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && go get google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+                  google.golang.org/protobuf/cmd/protoc-gen-go \
+                  github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
     && protoc-gen-go --version \
     && true
 
