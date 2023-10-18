@@ -15,7 +15,7 @@
 ###############################################################################
 # Stage 1: Create the developer image for the BUILDPLATFORM only
 ###############################################################################
-ARG GOLANG_VERSION=1.18
+ARG GOLANG_VERSION=1.19
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:$GOLANG_VERSION AS develop
 
 ARG PROTOC_VERSION=21.12
@@ -127,13 +127,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOARCH=${TARGETARCH:-amd64} \
     CGO_ENABLED=0 \
     GO111MODULE=on \
-    go build -a -o /go/bin/server ./proxy/
+    go mod tidy && go build -a -o /go/bin/server ./proxy/
 
 
 ###############################################################################
 # Stage 3: Copy binaries only to create the smallest final runtime image
 ###############################################################################
-FROM registry.access.redhat.com/ubi8/ubi-micro:8.7 as runtime
+FROM registry.access.redhat.com/ubi8/ubi-micro:8.8 as runtime
 
 ARG USER=2000
 
