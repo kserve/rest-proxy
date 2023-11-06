@@ -85,9 +85,7 @@ func run() error {
 	var transportCreds credentials.TransportCredentials
 	if useTLS, ok := os.LookupEnv(restProxyTlsEnvVar); ok && useTLS == "true" {
 		logger.Info("Using TLS")
-		transportCreds = credentials.NewTLS(&tls.Config{
-			InsecureSkipVerify: true,
-		})
+		transportCreds = credentials.NewTLS(&tls.Config{})
 	} else {
 		logger.Info("Not using TLS")
 		transportCreds = insecure.NewCredentials()
