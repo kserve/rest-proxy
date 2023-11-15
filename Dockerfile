@@ -94,6 +94,7 @@ RUN true \
 COPY .pre-commit-config.yaml ./
 RUN git init && \
     pre-commit install-hooks && \
+    git config --global --add safe.directory "*" && \
     rm -rf .git
 
 # Download dependencies before copying the source so they will be cached
@@ -127,7 +128,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOARCH=${TARGETARCH:-amd64} \
     CGO_ENABLED=0 \
     GO111MODULE=on \
-    go mod tidy && go build -a -o /go/bin/server ./proxy/
+    go build -a -o /go/bin/server ./proxy/
 
 
 ###############################################################################
