@@ -11,13 +11,13 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.#
+# limitations under the License.
 
 pre-commit run --all-files
 RETURN_CODE=$?
 ## cat this file for helping on identifying the root cause when some issue happens
-if [ -f /$USER/.cache/pre-commit/pre-commit.log ]; then
-  cat /$USER/.cache/pre-commit/pre-commit.log
+if [ -f .pre-commit.log ]; then
+  cat .pre-commit.log
 fi
 
 function echoError() {

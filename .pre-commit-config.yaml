@@ -16,6 +16,7 @@ repos:
     rev: v1.51.1
     hooks:
       - id: golangci-lint
+        log_file: .pre-commit.log
         entry: golangci-lint run
         exclude: ^(gen/)
         args:
@@ -24,6 +25,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: prettier
+        log_file: .pre-commit.log
         exclude: ^(.github/)
         args:
           - --no-bracket-spacing
