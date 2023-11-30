@@ -63,7 +63,7 @@ fmt:
 .PHONY: test
 ## Run tests
 test:
-	go test -coverprofile cover.out `go list ./...`
+	go test -coverprofile cover.out `go list -buildvcs=false ./...`
 
 .DEFAULT_GOAL := help
 .PHONY: help

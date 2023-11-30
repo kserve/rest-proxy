@@ -15,7 +15,7 @@
 ###############################################################################
 # Stage 1: Create the developer image for the BUILDPLATFORM only
 ###############################################################################
-ARG GOLANG_VERSION=1.18
+ARG GOLANG_VERSION=1.19
 FROM --platform=$BUILDPLATFORM registry.access.redhat.com/ubi8/go-toolset:$GOLANG_VERSION AS develop
 
 ARG PROTOC_VERSION=21.12
@@ -94,6 +94,7 @@ RUN true \
 COPY .pre-commit-config.yaml ./
 RUN git init && \
     pre-commit install-hooks && \
+    git config --global --add safe.directory "*" && \
     rm -rf .git
 
 # Download dependencies before copying the source so they will be cached
@@ -133,7 +134,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 ###############################################################################
 # Stage 3: Copy binaries only to create the smallest final runtime image
 ###############################################################################
-FROM registry.access.redhat.com/ubi8/ubi-micro:8.7 as runtime
+FROM registry.access.redhat.com/ubi8/ubi-micro:8.8 as runtime
 
 ARG USER=2000
 

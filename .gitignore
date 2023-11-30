@@ -22,3 +22,6 @@ google/
 
 # IDE
 .idea/
+
+.pre-commit.log
+

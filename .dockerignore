@@ -1,0 +1,8 @@
+.env
+.dockerignore
+.vscode
+.DS_Store
+Dockerfile
+temp
+.pre-commit.log
+
