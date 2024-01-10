@@ -6,7 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.0
 	google.golang.org/grpc v1.56.3
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.32.0
 	sigs.k8s.io/controller-runtime v0.14.1
 )
 
