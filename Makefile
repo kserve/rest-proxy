@@ -20,7 +20,7 @@ ENGINE ?= docker
 ifeq (run,$(firstword $(MAKECMDGOALS)))
   RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   ifneq ("$(wildcard /.dockerenv)","")
-    $(error Inside container image, run 'make $(RUN_ARGS)')
+    $(error Inside the developer container, run 'make $(RUN_ARGS)')
   endif
 endif
 
