@@ -32,7 +32,7 @@ After regenerating the gRPC gateway stubs, rebuild the `rest-proxy` Docker image
 make build
 ```
 
-If you need to use another builder than `docker`, you can specify it by using the `BUILDER` parameter:
+If you need to use another builder than `docker`, you can specify it by using the `ENGINE` variable:
 
 ```bash
 ENGINE=podman make build
