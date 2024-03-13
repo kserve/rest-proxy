@@ -13,12 +13,14 @@
 # limitations under the License.
 
 IMG_NAME ?= kserve/rest-proxy
+# make builder configurable, default to docker.
+ENGINE ?= docker
 
 # collect args from `make run` so that they don't run twice
 ifeq (run,$(firstword $(MAKECMDGOALS)))
   RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
   ifneq ("$(wildcard /.dockerenv)","")
-    $(error Inside docker container, run 'make $(RUN_ARGS)')
+    $(error Inside the developer container, run 'make $(RUN_ARGS)')
   endif
 endif
 
@@ -36,24 +38,24 @@ google/api/%.proto:
 	@test -f $@ || wget --inet4-only -q -O $@ https://raw.githubusercontent.com/googleapis/googleapis/master/$@
 
 .PHONY: build
-## Build runtime Docker image
+## Build runtime container image
 build:
-	docker build -t ${IMG_NAME}:latest --target runtime .
+	${ENGINE} build -t ${IMG_NAME}:latest --target runtime .
 
 .PHONY: build.develop
 ## Build develop container image
 build.develop:
-	docker build -t ${IMG_NAME}-develop:latest --target develop .
+	${ENGINE} build -t ${IMG_NAME}-develop:latest --target develop .
 
 .PHONY: develop
 ## Run interactive shell inside developer container
 develop: build.develop
-	./scripts/develop.sh
+	ENGINE=${ENGINE} && ./scripts/develop.sh
 
 .PHONY: run
 ## Run make target inside developer container (e.g. `make run fmt`)
 run: build.develop
-	./scripts/develop.sh make $(RUN_ARGS)
+	ENGINE=${ENGINE} && ./scripts/develop.sh make $(RUN_ARGS)
 
 .PHONY: fmt
 ## Auto-format source code and report code-style violations (lint)

@@ -24,7 +24,7 @@ all the required libraries pre-installed.
 make run generate
 ```
 
-### Build the Docker image
+### Build the Container image
 
 After regenerating the gRPC gateway stubs, rebuild the `rest-proxy` Docker image.
 
@@ -32,7 +32,13 @@ After regenerating the gRPC gateway stubs, rebuild the `rest-proxy` Docker image
 make build
 ```
 
-### Push the Docker image
+If you need to use another builder than `docker`, you can specify it by using the `ENGINE` variable:
+
+```bash
+ENGINE=podman make build
+```
+
+### Push the Container image
 
 Before pushing the new `rest-proxy` image to your container registry, re-tag the
 image created by `make build` in the step above.
