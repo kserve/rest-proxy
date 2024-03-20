@@ -6,7 +6,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.15.0
 	google.golang.org/grpc v1.56.3
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 	sigs.k8s.io/controller-runtime v0.14.1
 )
 
@@ -41,7 +41,7 @@ replace (
 	// Fixes CVE-2023-48795 - golang.org/x/crypto Authentication Bypass by Capture-replay
 	golang.org/x/crypto => golang.org/x/crypto v0.17.0
 	golang.org/x/net => golang.org/x/net v0.17.0
-	
+
 	// Fixes github.com/elazarl/goproxy Denial of Service (DoS), the dependency was removed in v0.27.0
 	// Remove below when upgrading to controller-runtime 0.15.x or apimachinery to 0.27.x
 	k8s.io/apimachinery => k8s.io/apimachinery v0.27.0
