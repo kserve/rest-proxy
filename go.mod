@@ -23,8 +23,8 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -37,10 +37,8 @@ require (
 )
 
 replace (
-	// The x/crypto is pulled from golang.org/x/net@v0.10.0
-	// Fixes CVE-2023-48795 - golang.org/x/crypto Authentication Bypass by Capture-replay
-	golang.org/x/crypto => golang.org/x/crypto v0.17.0
-	golang.org/x/net => golang.org/x/net v0.17.0
+	// Fixes CVE-2023-45288
+	golang.org/x/net => golang.org/x/net v0.23.0
 
 	// Fixes github.com/elazarl/goproxy Denial of Service (DoS), the dependency was removed in v0.27.0
 	// Remove below when upgrading to controller-runtime 0.15.x or apimachinery to 0.27.x
