@@ -77,13 +77,15 @@ RUN set -eux; \
 WORKDIR /opt/app
 
 COPY go.mod go.sum ./
+# Download dependencies before copying the source so they will be cached
+RUN go mod download
 
 # Install go protoc plugins,
 # no required module provides package google.golang.org/grpc/cmd/protoc-gen-go-grpc
 # to add it run `go get google.golang.org/grpc/cmd/protoc-gen-go-grpc`
 ENV PATH $HOME/go/bin:$PATH
 RUN true \
-    && go get google.golang.org/grpc/cmd/protoc-gen-go-grpc \
+    && go get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0 \
     && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
                   google.golang.org/protobuf/cmd/protoc-gen-go \
                   github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway \
@@ -96,9 +98,6 @@ RUN git init && \
     pre-commit install-hooks && \
     git config --global --add safe.directory "*" && \
     rm -rf .git
-
-# Download dependencies before copying the source so they will be cached
-RUN go mod download
 
 # the ubi/go-toolset image doesn't define ENTRYPOINT or CMD, but we need it to run 'make develop'
 CMD /bin/bash
