@@ -34,12 +34,13 @@ import (
 )
 
 const (
-	restProxyPortEnvVar     = "REST_PROXY_LISTEN_PORT"
-	restProxyGrpcMaxMsgSize = "REST_PROXY_GRPC_MAX_MSG_SIZE_BYTES"
-	restProxyGrpcPortEnvVar = "REST_PROXY_GRPC_PORT"
-	restProxyTlsEnvVar      = "REST_PROXY_USE_TLS"
-	tlsCertEnvVar           = "MM_TLS_KEY_CERT_PATH"
-	tlsKeyEnvVar            = "MM_TLS_PRIVATE_KEY_PATH"
+	restProxyPortEnvVar       = "REST_PROXY_LISTEN_PORT"
+	restProxyGrpcMaxMsgSize   = "REST_PROXY_GRPC_MAX_MSG_SIZE_BYTES"
+	restProxyGrpcPortEnvVar   = "REST_PROXY_GRPC_PORT"
+	restProxyTlsEnvVar        = "REST_PROXY_USE_TLS"
+	restProxySkipVerifyEnvVar = "REST_PROXY_SKIP_VERIFY"
+	tlsCertEnvVar             = "MM_TLS_KEY_CERT_PATH"
+	tlsKeyEnvVar              = "MM_TLS_PRIVATE_KEY_PATH"
 )
 
 var (
@@ -85,8 +86,20 @@ func run() error {
 	var transportCreds credentials.TransportCredentials
 	if useTLS, ok := os.LookupEnv(restProxyTlsEnvVar); ok && useTLS == "true" {
 		logger.Info("Using TLS")
+
+		skipVerifyBool := false
+		skipVerify, ok := os.LookupEnv(restProxySkipVerifyEnvVar)
+		if ok {
+			err := *new(error)
+			skipVerifyBool, err = strconv.ParseBool(skipVerify)
+			if err != nil {
+				logger.Error(err, "Failed to parse %s=%s to bool", restProxySkipVerifyEnvVar, skipVerify)
+				skipVerifyBool = false
+			}
+		}
+
 		transportCreds = credentials.NewTLS(&tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: skipVerifyBool,
 		})
 	} else {
 		logger.Info("Not using TLS")
