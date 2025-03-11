@@ -90,7 +90,7 @@ func run() error {
 		skipVerifyBool := false
 		skipVerify, ok := os.LookupEnv(restProxySkipVerifyEnvVar)
 		if ok {
-			err := *new(error)
+			var err error
 			skipVerifyBool, err = strconv.ParseBool(skipVerify)
 			if err != nil {
 				logger.Error(err, "Failed to parse %s=%s to bool", restProxySkipVerifyEnvVar, skipVerify)
