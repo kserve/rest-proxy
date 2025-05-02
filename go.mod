@@ -1,6 +1,6 @@
 module github.com/kserve/rest-proxy
 
-go 1.22.9
+go 1.23.6
 
 require (
 	github.com/google/go-cmp v0.6.0
