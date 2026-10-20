@@ -267,3 +267,62 @@ func TestBytesRESTRequest(t *testing.T) {
 	}
 
 }
+
+func TestBytesRESTRequestUnicodeEscapes(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       string
+		shape      []int64
+		parameters map[string]string
+		want       [][]byte
+	}{
+		{
+			name: "ascii escape",
+			data: `["\u0041"]`, shape: []int64{1},
+			want: [][]byte{[]byte("A")},
+		},
+		{
+			name: "BMP and surrogate pair",
+			data: `["\u4e2d\u6587", "\ud83d\ude00"]`, shape: []int64{2},
+			want: [][]byte{[]byte("中文"), []byte("😀")},
+		},
+		{
+			name: "nested strings with mixed escapes",
+			data: `[["\u00e9"], ["pre\n\u4E2D\tpost"]]`, shape: []int64{2, 1},
+			want: [][]byte{[]byte("é"), []byte("pre\n中\tpost")},
+		},
+		{
+			name: "unpaired surrogate",
+			data: `["\ud800x\udc00"]`, shape: []int64{1},
+			want: [][]byte{[]byte("\ufffdx\ufffd")},
+		},
+		{
+			name: "base64 string escape",
+			data: `["\u0053GVsbG8="]`, shape: []int64{1},
+			parameters: map[string]string{"content_type": "base64"},
+			want:       [][]byte{[]byte("Hello")},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			decoder := &CustomJSONPb{}
+			request := &gw.ModelInferRequest{}
+			payload := bytesRestRequest(test.shape, test.data, test.parameters)
+			if err := decoder.NewDecoder(strings.NewReader(payload)).Decode(request); err != nil {
+				t.Fatal(err)
+			}
+			wire, err := proto.Marshal(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			roundTrip := &gw.ModelInferRequest{}
+			if err := proto.Unmarshal(wire, roundTrip); err != nil {
+				t.Fatal(err)
+			}
+			want := &gw.InferTensorContents{BytesContents: test.want}
+			if got := roundTrip.GetInputs()[0].GetContents(); !proto.Equal(got, want) {
+				t.Errorf("decoded tensor contents = %v, want %v", got, want)
+			}
+		})
+	}
+}

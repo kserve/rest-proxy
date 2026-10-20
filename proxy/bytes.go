@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -137,10 +138,25 @@ func unmarshalStringArray(target *[][]byte, shape []int64, b64 bool, data []byte
 				if i >= l {
 					break // will error with unexpected end
 				}
-				cp := utf16.Decode([]uint16{binary.BigEndian.Uint16(data[i-3 : i+1])})
-				for _, r := range cp {
-					j += utf8.EncodeRune(data[j:], r)
+				codePoint, err := strconv.ParseUint(string(data[i-3:i+1]), 16, 16)
+				if err != nil {
+					return fmt.Errorf("invalid unicode escape in json string: %w", err)
 				}
+				r := rune(codePoint)
+				if utf16.IsSurrogate(r) {
+					r = utf8.RuneError
+					if i+6 < l && data[i+1] == '\\' && data[i+2] == 'u' {
+						next, err := strconv.ParseUint(string(data[i+3:i+7]), 16, 16)
+						if err != nil {
+							return fmt.Errorf("invalid unicode escape in json string: %w", err)
+						}
+						if decoded := utf16.DecodeRune(rune(codePoint), rune(next)); decoded != utf8.RuneError {
+							r = decoded
+							i += 6
+						}
+					}
+				}
+				j += utf8.EncodeRune(data[j:], r)
 				continue
 			} else if b, ok = escMap[b]; !ok {
 				return errors.New("invalid escaped char in json string")
